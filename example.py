@@ -1,58 +1,29 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-#
-# File: example_stream_everything.py
-#
-# Part of ‘UNICORN Binance WebSocket API’
-# Project website: https://github.com/oliver-zehentleitner/unicorn-binance-websocket-api
-# Documentation: https://oliver-zehentleitner.github.io/unicorn-binance-websocket-api
-# PyPI: https://pypi.org/project/unicorn-binance-websocket-api/
-#
-# Author: Oliver Zehentleitner
-#         https://about.me/oliver-zehentleitner
-#
-# Copyright (c) 2019-2021, Oliver Zehentleitner
-# All rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish, dis-
-# tribute, sublicense, and/or sell copies of the Software, and to permit
-# persons to whom the Software is furnished to do so, subject to the fol-
-# lowing conditions:
-#
-# The above copyright notice and this permission notice shall be included
-# in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-# OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABIL-
-# ITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-# SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-# IN THE SOFTWARE.
-
 import logging
 import math
 import os
 import sys
 import threading
-import time
+import time, signal
+from unicorn_fy import UnicornFy
 
 import requests
 import unicorn_binance_websocket_api
 
 from producer import ExamplePublisher
 
+def signal_handler(sig, frame):
+    print('You pressed Ctrl+C!')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+#print('Press Ctrl+C')
+#signal.pause()
+
 publisher = ExamplePublisher(
     'amqp://guest:guest@localhost:7201/%2F?connection_attempts=3&heartbeat=3600'
 )
 publisher.start()
 time.sleep(4)
-publisher.send_message('example.text', 'foobar')
-
-#example.run()
 
 try:
     import unicorn_binance_rest_api
@@ -81,7 +52,8 @@ def print_stream_data_from_stream_buffer(binance_websocket_api_manager):
         oldest_stream_data_from_stream_buffer = binance_websocket_api_manager.pop_stream_data_from_stream_buffer()
         if oldest_stream_data_from_stream_buffer is not False:
             #print(oldest_stream_data_from_stream_buffer)
-            publisher.send_message('example.text', oldest_stream_data_from_stream_buffer)
+            #publisher.send_message('example.text', oldest_stream_data_from_stream_buffer)
+            print(UnicornFy.binance_com_websocket(oldest_stream_data_from_stream_buffer))
 
             pass
         else:
@@ -141,7 +113,13 @@ for channel in channels:
                 loops += 1
             i += 1
 
-while True:
-    binance_websocket_api_manager.print_summary()
+time.sleep(10)
+print("Publisher stopping")
+publisher.stop()
+print("Stop manager")
+#binance_websocket_api_manager.stop_manager_with_all_streams()
+#while True:
+#    print("Hei")
+    #binance_websocket_api_manager.print_summary()
     # binance_websocket_api_manager.print_stream_info(arr_stream_id)
-    time.sleep(1)
+#    time.sleep(1)

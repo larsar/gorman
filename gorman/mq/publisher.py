@@ -1,25 +1,20 @@
-# -*- coding: utf-8 -*-
-# pylint: disable=C0111,C0103,R0205
-
 import logging
-
+import os
 import pika
 from pika.exchange_type import ExchangeType
 
-LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
-              '-35s %(lineno) -5d: %(message)s')
-LOGGER = logging.getLogger(__name__)
+from gorman import logger
+log = logger(__name__)
 
 import threading
 
 
-class ExamplePublisher(threading.Thread):
-    EXCHANGE = 'binance'
+class Publisher(threading.Thread):
     EXCHANGE_TYPE = ExchangeType.topic
 
-    def __init__(self, amqp_url):
-        super(ExamplePublisher, self).__init__()
-
+    def __init__(self, amqp_url, exchange):
+        super(Publisher, self).__init__()
+        self.exchange = exchange
         self._connection = None
         self._channel = None
 
@@ -27,7 +22,6 @@ class ExamplePublisher(threading.Thread):
         self._url = amqp_url
 
     def connect(self):
-        LOGGER.info('Connecting to %s', self._url)
         return pika.SelectConnection(
             pika.URLParameters(self._url),
             on_open_callback=self.on_connection_open,
@@ -35,11 +29,11 @@ class ExamplePublisher(threading.Thread):
             on_close_callback=self.on_connection_closed)
 
     def on_connection_open(self, _unused_connection):
-        LOGGER.info('Connection opened')
+        log.info('Connection opened')
         self.open_channel()
 
     def on_connection_open_error(self, _unused_connection, err):
-        LOGGER.error('Connection open failed, reopening in 5 seconds: %s', err)
+        log.error('Connection open failed, reopening in 5 seconds: %s', err)
         self._connection.ioloop.call_later(5, self._connection.ioloop.stop)
 
     def on_connection_closed(self, _unused_connection, reason):
@@ -47,32 +41,32 @@ class ExamplePublisher(threading.Thread):
         if self._stopping:
             self._connection.ioloop.stop()
         else:
-            LOGGER.warning('Connection closed, reopening in 5 seconds: %s',
+            log.warning('Connection closed, reopening in 5 seconds: %s',
                            reason)
             self._connection.ioloop.call_later(5, self._connection.ioloop.stop)
 
     def open_channel(self):
-        LOGGER.info('Creating a new channel')
+        log.info('Creating a new channel')
         self._connection.channel(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
-        LOGGER.info('Channel opened')
+        log.info('Channel opened')
         self._channel = channel
         self.add_on_channel_close_callback()
-        self.setup_exchange(self.EXCHANGE)
+        self.setup_exchange(self.exchange)
 
     def add_on_channel_close_callback(self):
-        LOGGER.info('Adding channel close callback')
+        log.info('Adding channel close callback')
         self._channel.add_on_close_callback(self.on_channel_closed)
 
     def on_channel_closed(self, channel, reason):
-        LOGGER.warning('Channel %i was closed: %s', channel, reason)
+        log.warning('Channel %i was closed: %s', channel, reason)
         self._channel = None
         if not self._stopping:
             self._connection.close()
 
     def setup_exchange(self, exchange_name):
-        LOGGER.info('Declaring exchange %s', exchange_name)
+        log.info('Declaring exchange %s', exchange_name)
         self._channel.exchange_declare(
             exchange=exchange_name,
             exchange_type=self.EXCHANGE_TYPE)
@@ -96,26 +90,13 @@ class ExamplePublisher(threading.Thread):
         """
         while not self._stopping:
             self._connection = None
-            self._deliveries = []
-            self._acked = 0
-            self._nacked = 0
-            self._message_number = 0
+            self._connection = self.connect()
+            self._connection.ioloop.start()
 
-            try:
-                self._connection = self.connect()
-                self._connection.ioloop.start()
-            except KeyboardInterrupt:
-                self.stop()
-                if (self._connection is not None and
-                        not self._connection.is_closed):
-                    # Finish closing
-                    self._connection.ioloop.start()
-
-        LOGGER.info('Stopped')
+        log.info('Stopped')
 
     def stop(self):
-
-        LOGGER.info('Stopping')
+        log.info('Stopping')
         self._stopping = True
         self.close_channel()
         self.close_connection()
@@ -126,11 +107,11 @@ class ExamplePublisher(threading.Thread):
 
         """
         if self._channel is not None:
-            LOGGER.info('Closing the channel')
+            log.info('Closing the channel')
             self._channel.close()
 
     def close_connection(self):
         """This method closes the connection to RabbitMQ."""
         if self._connection is not None:
-            LOGGER.info('Closing connection')
+            log.info('Closing connection')
             self._connection.close()
