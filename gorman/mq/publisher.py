@@ -2,7 +2,7 @@ import logging
 import os
 import pika
 from pika.exchange_type import ExchangeType
-
+import json
 from gorman import logger
 log = logger(__name__)
 
@@ -71,18 +71,18 @@ class Publisher(threading.Thread):
             exchange=exchange_name,
             exchange_type=self.EXCHANGE_TYPE)
 
-    def send_message(self, routing_key, payload):
+    def send_message(self, routing_key, type, payload):
         if self._channel is None or not self._channel.is_open:
             return
-        self._channel.basic_publish(exchange='message',
+        self._channel.basic_publish(exchange=self.exchange,
                                     routing_key=routing_key,
                                     properties=pika.BasicProperties(
-                                        content_type='text/plain',
+                                        content_type='application/json',
                                         delivery_mode=1,
-                                        expiration=str(60)  # ,
-                                        # type = type
+                                        expiration=str(60000),
+                                        type = type
                                     ),
-                                    body=payload)
+                                    body=json.dumps(payload).encode('utf-8'))
 
     def run(self):
         """Run the example code by connecting and then starting the IOLoop.

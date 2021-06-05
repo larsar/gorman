@@ -31,6 +31,18 @@ class BinanceStreamer:
         except requests.exceptions.ConnectionError:
             raise Exception("Network error")
 
+    def publish(self, payload):
+        #print(payload)
+        if 'symbol' in payload.keys():
+            # log.info(payload['symbol'])
+            self.publisher.send_message(payload['symbol'],payload['event_type'], payload)
+
+        # elif 'data' in payload.keys():
+        #    log.info(payload['data']['s'])
+        else:
+            log.warn('Unhandled: {}'.format(payload))
+        #self.publisher.send_message()
+
     def print_stream_data_from_stream_buffer(self, binance_websocket_api_manager):
         while True:
             if binance_websocket_api_manager.is_manager_stopping():
@@ -43,8 +55,15 @@ class BinanceStreamer:
                # self.publisher.send_message(
                #     )
                 payload = UnicornFy.binance_com_websocket(oldest_stream_data_from_stream_buffer)
-                #print("Foo")
-                pass
+                #payload = (oldest_stream_data_from_stream_buffer)
+                if 'data' in payload.keys():
+                    # Loop
+                    for d in payload['data']:
+                        self.publish(d)
+                else:
+                    self.publish(payload)
+
+
             else:
                 time.sleep(0.01)
 
@@ -60,7 +79,7 @@ class BinanceStreamer:
         data = self.binance_rest_client.get_all_tickers()
         for item in data:
             markets.append(item['symbol'])
-
+        markets = ['BTCUSDT']
         # private_stream_id_alice = binance_websocket_api_manager.create_stream(["!userData"],
         #                                                                       ["arr"],
         #                                                                       api_key=binance_api_key,
@@ -73,10 +92,10 @@ class BinanceStreamer:
         #                                                                     api_secret="bbb",
         #                                                                     stream_label="userData Bob")
 
-        arr_stream_id = self.binance_websocket_api_manager.create_stream(self.arr_channels, "arr",
-                                                                         stream_label="arr channels",
-                                                                         ping_interval=10, ping_timeout=10,
-                                                                         close_timeout=5)
+        # arr_stream_id = self.binance_websocket_api_manager.create_stream(self.arr_channels, "arr",
+        #                                                                  stream_label="arr channels",
+        #                                                                  ping_interval=10, ping_timeout=10,
+        #                                                                  close_timeout=5)
 
         divisor = math.ceil(
             len(markets) / self.binance_websocket_api_manager.get_limit_of_subscriptions_per_stream())
